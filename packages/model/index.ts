@@ -23,6 +23,6 @@ export const foodPartnerLogin = z.object({
 })
 
 export const foodUploadSchema = z.object({
-    vedio: z.string().nonempty(),
+    title: z.string(),
     description: z.string()
 })

@@ -27,14 +27,15 @@ model FoodPartner {
   email              String @unique
   password           String
   timestamp          DateTime @default(now())
-  food               Food[]
+  foods               Food[]
 }
 
 model Food {
-  id                String @id @default(uuid())
-  foodPartner       String
-  foodPartnerId     FoodPartner @relation(fields: [foodPartner], references: [id])
-  vedio             String @unique
-  title             String
-  description       String 
+  id            String   @id @default(uuid())
+  foodPartnerId String
+  foodPartner   FoodPartner @relation(fields: [foodPartnerId], references: [id])
+  video         String   @unique    
+  title         String
+  description   String? 
+  createdAt     DateTime @default(now())
 }
