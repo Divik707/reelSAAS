@@ -3,23 +3,17 @@ import ImageKit from "imagekit";
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY || "",
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
-  urlEndpoint: process.env.IMAGEKIT_END_URI || ""  
+  urlEndpoint: process.env.IMAGEKIT_END_URI || ""   
 });
 
-interface UploadInput {
-  file: File | Buffer | string;
-  fileName: string;
-}
-
-async function uploadFile(file: File | Buffer | string, fileName: string) {
+export async function uploadFile(file: string | Buffer, fileName: string) {
   try {
-    const res = await imagekit.upload({
-        //@ts-ignore
-      file,
-      fileName,
-    });
-    return res;
+      const response = await imagekit.upload({
+    file,
+    fileName
+  })
+  return response;
   } catch (error) {
-    console.error("ImageKit upload error:", error);
-    throw error;          
-}}
+    console.log(error)
+  }
+}

@@ -10,12 +10,10 @@ const JWT_SECRET = process.env.JWT_SECRET || "random";
 foodP.post('/register', async(req, res) => {
     try {
         const zodifiedD = foodPartnerRegister.safeParse(req.body);
-        if (!zodifiedD.success) {          // better than checking .error
+        if (!zodifiedD.success) {        
             console.log("Validation errors:", zodifiedD.error.errors);
-            // or even better:
             console.log("Validation failed:", zodifiedD.error.flatten());
             
-            // And return to client too
             return res.status(400).json({
                 success: false,
                 message: "Invalid input data",
@@ -58,12 +56,12 @@ foodP.post('/register', async(req, res) => {
 foodP.post('/login', async(req, res) => {
     try {
         const zodifiedD = foodPartnerLogin.safeParse(req.body);
-        if (!zodifiedD.success) {          // better than checking .error
+        if (!zodifiedD.success) {          
             console.log("Validation errors:", zodifiedD.error.errors);
-            // or even better:
+          
             console.log("Validation failed:", zodifiedD.error.flatten());
             
-            // And return to client too
+            
             return res.status(400).json({
                 success: false,
                 message: "Invalid input data",
@@ -81,7 +79,7 @@ foodP.post('/login', async(req, res) => {
             }) 
             if(userT) {
                 if(await bcrypt.compare(zodifiedD.data.password, userT.password)) {
-                    // token generation
+                    
                     const token = jwt.sign({id: userT.id}, JWT_SECRET, {expiresIn: '5d'});
                     res.json({
                         message: "food partner login",
