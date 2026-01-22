@@ -1,13 +1,15 @@
 import { Router } from "express";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+
 import { foodPartnerAuth } from "../../middleware";
 import { foodUploadSchema } from "@repo/model/schema";
-import type { Request, Response } from "express";
-import multer from "multer";
-import { v4 as uuidv4 } from "uuid"; 
 import { prisma } from "@repo/db/client";
 import { uploadFile } from "../../api/storage.services";
 
-const foodRouter: Router = Router();
+import type { Request, Response } from "express";
+
+const foodRouter = Router();
 
 export interface AuthenticatedRequest extends Request {
   foodPartner?: {
@@ -15,71 +17,100 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-const uploads = multer({
+const upload = multer({
   storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 200 * 1024 * 1024, 
+  },
 });
 
 foodRouter.post(
   "/post",
   foodPartnerAuth,
-  uploads.single("video"), // ← fixed typo from "vedio"
+  upload.single("video"),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const parsed = foodUploadSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid input",
-          errors: parsed.error.errors,
-        });
-      }
-
       const foodPartner = req.foodPartner;
       if (!foodPartner?.id) {
         return res.status(401).json({
           success: false,
-          message: "Authenticated food partner ID not found",
+          message: "Authentication failed - food partner ID missing",
         });
       }
 
       if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: "No video file uploaded",
+          message: "No video file uploaded. Field name must be 'video'.",
         });
       }
 
-      const extension = req.file.mimetype.split("/")[1] || "mp4";
+      const parseResult = foodUploadSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        console.log("Validation error:", parseResult.error.format());
+        return res.status(400).json({
+          success: false,
+          message: "Invalid input data",
+          errors: parseResult.error.flatten().fieldErrors,
+        });
+      }
+
+      const { title, description } = parseResult.data;
+
+      const mimeType = req.file.mimetype;
+      let extension = "mp4";
+
+      if (mimeType.startsWith("video/")) {
+        extension = mimeType.split("/")[1] || "mp4";
+      } else if (mimeType === "application/octet-stream") {
+        extension = "mp4";
+      }
+
       const fileName = `${uuidv4()}.${extension}`;
 
-      const uploadRes = await uploadFile(req.file.buffer, fileName);
+      const uploadResult = await uploadFile(req.file.buffer, fileName);
 
-      if (!uploadRes) {
+      if (!uploadResult?.url) {
         return res.status(500).json({
           success: false,
-          message: "Failed to upload video file",
+          message: "Failed to upload video to storage",
         });
       }
 
-      await prisma.food.create({
+      const videoUrl = uploadResult.url;
+
+      const newPost = await prisma.food.create({
         data: {
-          video: uploadRes.url,           
-          title: parsed.data.title,
-          description: parsed.data.description,
+          foodPartnerId: foodPartner.id,
+          video: videoUrl,         
+          title,
+          description: description ?? null,
         },
       });
 
       return res.status(201).json({
         success: true,
         message: "Video posted successfully",
-        videoUrl: uploadRes.url,
+        post: {
+          id: newPost.id,
+          videoUrl: newPost.video,   
+          title: newPost.title,
+          description: newPost.description,
+          createdAt: newPost.createdAt?.toISOString(),
+        },
       });
-    } catch (error: any) {
-      console.error("Post creation error:", error);
+    } catch (err: any) {
+      console.error("Error in /foodpartner/post:", {
+        message: err.message,
+        stack: err.stack?.split("\n").slice(0, 3),
+        body: req.body,
+        file: req.file ? `${req.file.originalname} (${req.file.size} bytes)` : null,
+      });
+
       return res.status(500).json({
         success: false,
-        message: "Failed to post video",
-        error: error.message || "Unknown error",
+        message: "Server error while creating post",
+        error: process.env.NODE_ENV === "development" ? err.message : undefined,
       });
     }
   }
